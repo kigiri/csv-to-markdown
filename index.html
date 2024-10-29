@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title></title>
+<style type="text/css">
+b { color: hotpink }
+* { font-family: monospace }
+[name=size] { width: 4ch }
+[name=title] { field-sizing: content; min-width: 6ch }
+body {
+  min-height: 100vh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+form {
+  padding: 1em;
+  background: #fff;
+  margin: 0;
+  display: flex;
+  align-content: center;
+  justify-content: center;
+  gap: 1ch;
+}
+pre {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  resize: both;
+  flex: 1;
+  background: #ccc;
+  margin: 0;
+  padding: 1em;
+  outline-offset: -4ch;
+  font-size: 16px;
+}
+pre.csv {
+  text-align: left;
+  font-size: inherit;
+}
+pre:not(.csv) code {
+  text-align: center;
+}
+code {
+  display: inline-flex;
+  max-width: 80ch;
+  white-space: pre-wrap;
+}
+pre.drop {
+  outline: dashed 2ch #888;
+}
+</style>
+</head>
+<body>
+
+<form>
+  <label title="maximum width of the tabular data">Max width:<input type=number name=size value=30></label>
+  <label>Title column:<input type=text name=title></label>
+  <label>📂 <input type=file /></label>
+</form>
+
+<pre><code>ctrl<b>+</b>v | drag<b>&</b>drop<code/></pre>
+
+<script type=module>
+import Papa from "https://esm.sh/papaparse@5.4.1"
+
+const codeEl = document.querySelector('code')
+const preEl = document.querySelector('pre')
+const titleEl = document.querySelector('[name=title]')
+const sizeEl = document.querySelector('[name=size]')
+const fileEl = document.querySelector('[type=file]')
+let LAST_CSV
+const showMarkdown = value => {
+  const csv = value ? (LAST_CSV = value) : LAST_CSV
+  if (!csv) return
+  preEl.classList.remove('drop')
+  preEl.classList.add('csv')
+  codeEl.replaceChildren(toMarkdown({
+    csv,
+    title: titleEl.value.trim(),
+    maxMetaSize: Number(sizeEl.value),
+  }))
+}
+
+sizeEl.addEventListener('input', e => showMarkdown())
+titleEl.addEventListener('input', e => showMarkdown())
+
+fileEl.addEventListener('input', e => {
+  fileEl.files[0].text().then(showMarkdown)
+})
+
+addEventListener("paste", ({ clipboardData }) => {
+  showMarkdown(clipboardData.getData('text/plain'))
+})
+
+preEl.addEventListener('drop', d => {
+  d.preventDefault()
+  preEl.classList.remove('drop')
+  const file = d.dataTransfer.files?.[0]
+    || d.dataTransfer.items[0].getAsFile()
+  file.text().then(showMarkdown)
+})
+
+preEl.addEventListener('dragover', e => {
+  e.preventDefault()
+  preEl.classList.add('drop')
+})
+preEl.addEventListener('dragleave', e => {
+  preEl.classList.remove('drop')
+})
+
+
+const toMarkdown = ({ csv, title, maxMetaSize = 35 }) => {
+  const { data, errors } = Papa.parse(csv, { header: true })
+  const columnSize = {}
+  title in data[0] || (title = Object.keys(data[0])[0])
+  console.log({ title })
+  for (const row of data) {
+    for (const [k, v] of Object.entries(row)) {
+      if (k === title) continue
+      columnSize[k] = Math.max(columnSize[k] || k.length, v.length)
+    }
+  }
+  const metaRows = Object.entries(columnSize).filter(([_, size]) => size < maxMetaSize).map(e => e[0])
+  const subjectRows = Object.keys(columnSize).filter(k => !metaRows.includes(k))
+  const pick = (obj, fields) => Object.fromEntries(fields.map(f => [f, obj[f]]))
+  const makeTable = (data) => [
+    Object.keys(data).map(s => s.padEnd(columnSize[s])).join(' | '),
+    Object.keys(data).map(s => '-'.repeat(columnSize[s])).join(' | '),
+    Object.entries(data).map(([k, s]) => s.trim().padEnd(columnSize[k])).join(' | '),
+  ].join('\n')
+
+  return data.map(({ [title]: Title, ...row }) => `
+## ${Title.trim()}
+
+${makeTable(pick(row, metaRows))}
+
+${Object.entries(pick(row, subjectRows))
+  .map(([k,v]) => `### ${k}\n${v.trim()}`).join('\n\n')}
+`).join('\n')
+}
+</script>
+</body>
+</html>
