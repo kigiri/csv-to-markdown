@@ -129,7 +129,7 @@ const toMarkdown = ({ csv, title, maxMetaSize = 35 }) => {
   const makeTable = (data) => [
     Object.keys(data).map(s => s.padEnd(columnSize[s])).join(' | '),
     Object.keys(data).map(s => '-'.repeat(columnSize[s])).join(' | '),
-    Object.entries(data).map(([k, s]) => s.trim().padEnd(columnSize[k])).join(' | '),
+    Object.entries(data).map(([k, s = '']) => s.trim().padEnd(columnSize[k])).join(' | '),
   ].join('\n')
 
   return data.map(({ [title]: Title, ...row }) => `
@@ -138,7 +138,7 @@ const toMarkdown = ({ csv, title, maxMetaSize = 35 }) => {
 ${makeTable(pick(row, metaRows))}
 
 ${Object.entries(pick(row, subjectRows))
-  .map(([k,v]) => `### ${k}\n${v.trim()}`).join('\n\n')}
+  .map(([k,v = '']) => `### ${k}\n${v.trim()}`).join('\n\n')}
 `).join('\n')
 }
 </script>
