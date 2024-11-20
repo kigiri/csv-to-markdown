@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -59,6 +60,8 @@ pre.drop {
   <label title="maximum width of the tabular data">Max width:<input type=number name=size value=30></label>
   <label>Title column:<input type=text name=title></label>
   <label>📂 <input type=file /></label>
+  <button type="button" id="copy" disabled>📋copy</button>
+  <button type="button" id="save" disabled>💾save</button>
 </form>
 
 <pre><code>ctrl<b>+</b>v | drag<b>&</b>drop<code/></pre>
@@ -71,19 +74,54 @@ const preEl = document.querySelector('pre')
 const titleEl = document.querySelector('[name=title]')
 const sizeEl = document.querySelector('[name=size]')
 const fileEl = document.querySelector('[type=file]')
+const copyEl = document.getElementById('copy')
+const saveEl = document.getElementById('save')
 let LAST_CSV
+let LAST_MD
 const showMarkdown = value => {
   const csv = value ? (LAST_CSV = value) : LAST_CSV
-  if (!csv) return
+  if (!csv) {
+    copyEl.disabled = true
+    saveEl.disabled = true
+    return
+  }
+  copyEl.disabled = false
+  saveEl.disabled = false
   preEl.classList.remove('drop')
   preEl.classList.add('csv')
-  codeEl.replaceChildren(toMarkdown({
+  LAST_MD = toMarkdown({
     csv,
     title: titleEl.value.trim(),
     maxMetaSize: Number(sizeEl.value),
-  }))
+  })
+  codeEl.replaceChildren(LAST_MD)
 }
 
+copyEl.addEventListener('click', e => {
+  if (!LAST_MD) return
+  copyEl.disabled = true
+  navigator.clipboard.writeText(LAST_MD)
+    .then(() => {
+      const original = copyEl.textContent
+      copyEl.replaceChildren('✅done')
+      setTimeout(() => copyEl.replaceChildren(original), 500)
+    })
+    .catch((err) => {
+      const original = copyEl.textContent
+      copyEl.replaceChildren('❌fail')
+      setTimeout(() => copyEl.replaceChildren(original), 500)
+    })
+    .finally(() => copyEl.disabled = false)
+})
+saveEl.addEventListener('click', e => {
+  if (!LAST_MD) return
+  const a = document.createElement("a")
+  const file = new Blob([LAST_MD], { type: 'text/plain' })
+  a.href = URL.createObjectURL(file)
+  a.download = `${new Date().toISOString().replace('T', '_').split('.')[0]}.md`
+  a.click()
+  URL.revokeObjectURL(a.href)
+})
 sizeEl.addEventListener('input', e => showMarkdown())
 titleEl.addEventListener('input', e => showMarkdown())
 
